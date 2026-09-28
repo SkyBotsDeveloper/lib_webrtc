@@ -7,6 +7,7 @@
 #pragma once
 
 #include "webrtc/webrtc_device_common.h"
+#include "webrtc/webrtc_create_adm.h"
 
 #include <api/scoped_refptr.h>
 #include <modules/audio_device/include/audio_device.h>
@@ -39,7 +40,9 @@ struct DeviceResolvedIds {
 
 class AudioDeviceOpenAL : public webrtc::AudioDeviceModule {
 public:
-	explicit AudioDeviceOpenAL(webrtc::TaskQueueFactory *taskQueueFactory);
+	explicit AudioDeviceOpenAL(
+		webrtc::TaskQueueFactory *taskQueueFactory,
+		CaptureProcessor processor = {});
 	~AudioDeviceOpenAL();
 
 	[[nodiscard]] Fn<void(DeviceResolvedId)> setDeviceIdCallback();
@@ -193,6 +196,7 @@ private:
 
 	rtc::Thread *_thread = nullptr;
 	webrtc::AudioDeviceBuffer _audioDeviceBuffer;
+	CaptureProcessor _captureProcessor;
 	std::unique_ptr<Data> _data;
 
 	std::shared_ptr<DeviceResolvedIds> _deviceResolvedIds;

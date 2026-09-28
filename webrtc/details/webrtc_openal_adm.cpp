@@ -261,8 +261,10 @@ std::invoke_result_t<Callback> AudioDeviceOpenAL::sync(Callback &&callback) {
 }
 
 AudioDeviceOpenAL::AudioDeviceOpenAL(
-	webrtc::TaskQueueFactory *taskQueueFactory)
+	webrtc::TaskQueueFactory *taskQueueFactory,
+	CaptureProcessor processor)
 : _audioDeviceBuffer(taskQueueFactory)
+, _captureProcessor(std::move(processor))
 , _deviceResolvedIds(std::make_shared<DeviceResolvedIds>()) {
 	_audioDeviceBuffer.SetRecordingSampleRate(kRecordingFrequency);
 	_audioDeviceBuffer.SetRecordingChannels(_recordingChannels);
@@ -818,6 +820,14 @@ bool AudioDeviceOpenAL::processRecordedPart(bool firstInCycle) {
 	if (Failed(_recordingDevice)) {
 		restartRecordingQueued();
 		return false;
+	}
+	if (_captureProcessor && !_loopbackOnly
+		&& _recordingChannels == kRecordingChannelsMono) {
+		_captureProcessor(
+			reinterpret_cast<int16_t*>(_data->recordedSamples.data()),
+			kRecordingPart,
+			kRecordingFrequency,
+			_recordingChannels);
 	}
 #ifdef WEBRTC_LINUX
 	if (_recordingLoopback

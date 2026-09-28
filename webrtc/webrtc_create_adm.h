@@ -7,6 +7,9 @@
 #pragma once
 
 #include <functional>
+#include <cstdint>
+#include <cstddef>
+#include <memory>
 
 namespace webrtc {
 class AudioDeviceModule;
@@ -25,12 +28,16 @@ namespace Webrtc {
 struct DeviceResolvedId;
 
 using AudioDeviceModulePtr = rtc::scoped_refptr<webrtc::AudioDeviceModule>;
+// Runs on the ADM capture thread, immediately before delivery to WebRTC.
+using CaptureProcessor = std::function<void(int16_t*, int, int, int)>;
 AudioDeviceModulePtr CreateAudioDeviceModule(
 	webrtc::TaskQueueFactory* factory,
-	Fn<void(Fn<void(DeviceResolvedId)>)> saveSetDeviceIdCallback);
+	Fn<void(Fn<void(DeviceResolvedId)>)> saveSetDeviceIdCallback,
+	CaptureProcessor processor = {});
 
 auto AudioDeviceModuleCreator(
-	Fn<void(Fn<void(DeviceResolvedId)>)> saveSetDeviceIdCallback)
+	Fn<void(Fn<void(DeviceResolvedId)>)> saveSetDeviceIdCallback,
+	CaptureProcessor processor = {})
 -> std::function<AudioDeviceModulePtr(webrtc::TaskQueueFactory*)>;
 
 AudioDeviceModulePtr CreateLoopbackAudioDeviceModule(
@@ -39,5 +46,21 @@ AudioDeviceModulePtr CreateLoopbackAudioDeviceModule(
 
 auto LoopbackAudioDeviceModuleCreator()
 -> std::function<AudioDeviceModulePtr(webrtc::TaskQueueFactory*)>;
+
+// Owns both the existing loopback ADM and its task-queue factory. The callback
+// runs on the loopback capture thread and must not block.
+class LoopbackAudioTap final {
+public:
+	using Callback = std::function<void(
+		const int16_t*, size_t, size_t, size_t, uint32_t)>;
+	explicit LoopbackAudioTap(Callback callback);
+	~LoopbackAudioTap();
+	[[nodiscard]] bool start();
+	void stop();
+
+private:
+	class Impl;
+	std::unique_ptr<Impl> _impl;
+};
 
 } // namespace Webrtc
